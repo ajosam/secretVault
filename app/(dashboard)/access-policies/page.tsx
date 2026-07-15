@@ -1,5 +1,11 @@
-import { namespaces, ROLE_NAMES, policyMatrix } from "@/lib/data";
+import type { PermissionLevel } from "@/lib/types";
 import { PermissionMatrix } from "@/components/PermissionMatrix";
+
+const namespaces: { id: string; name: string }[] = [];
+const ROLE_NAMES = ["Super Admin", "Admin", "DevOps", "Developer", "Auditor"] as const;
+const policyMatrix: Record<string, Record<string, PermissionLevel>> = Object.fromEntries(
+  ROLE_NAMES.map((role) => [role, {}]),
+);
 
 export default function AccessPoliciesPage() {
   const columns = namespaces.map((ns) => ns.name);

@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
-import { secrets, namespaces } from "@/lib/data";
-import type { SecretStatus } from "@/lib/types";
+import type { Secret, SecretStatus } from "@/lib/types";
 import { SecretsTable } from "@/components/SecretsTable";
 import { DetailsPanel } from "@/components/DetailsPanel";
+
+const secrets: Secret[] = [];
+const namespaces: { id: string; name: string }[] = [];
 
 const STATUS_OPTIONS: Array<{ value: SecretStatus | "all"; label: string }> = [
   { value: "all", label: "All statuses" },

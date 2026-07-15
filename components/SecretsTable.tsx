@@ -2,7 +2,7 @@
 
 import type { Secret } from "@/lib/types";
 import { StatusBadge } from "./StatusBadge";
-import { formatTimestamp } from "@/lib/data";
+import { formatTimestamp } from "@/lib/format";
 
 const POLICY_LABEL: Record<Secret["rotationPolicy"], string> = {
   "30d": "Every 30 days",

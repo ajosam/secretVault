@@ -1,5 +1,8 @@
-import { namespaces, formatTimestamp } from "@/lib/data";
+import { formatTimestamp } from "@/lib/format";
+import type { Namespace } from "@/lib/types";
 import { FolderTree } from "lucide-react";
+
+const namespaces: Namespace[] = [];
 
 export default function NamespacesPage() {
   return (
@@ -39,6 +42,13 @@ export default function NamespacesPage() {
               <td className="px-3 py-2.5 font-mono text-[11.5px] text-fg-subtle">{ns.policy}</td>
             </tr>
           ))}
+          {namespaces.length === 0 && (
+            <tr>
+              <td colSpan={5} className="px-6 py-10 text-center text-fg-subtle">
+                No namespaces yet.
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>

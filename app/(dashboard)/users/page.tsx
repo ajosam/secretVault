@@ -1,5 +1,8 @@
-import { users, formatTimestamp } from "@/lib/data";
+import { formatTimestamp } from "@/lib/format";
+import type { AppUser } from "@/lib/types";
 import { ShieldCheck, ShieldOff } from "lucide-react";
+
+const users: AppUser[] = [];
 
 const STATUS_STYLES: Record<string, string> = {
   active: "bg-success/10 text-success border-success/25",
@@ -60,6 +63,13 @@ export default function UsersPage() {
               </td>
             </tr>
           ))}
+          {users.length === 0 && (
+            <tr>
+              <td colSpan={5} className="px-6 py-10 text-center text-fg-subtle">
+                No users yet.
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>

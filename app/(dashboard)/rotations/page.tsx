@@ -1,5 +1,8 @@
-import { rotations, formatTimestamp, formatRelativeToNow } from "@/lib/data";
+import { formatTimestamp, formatRelativeToNow } from "@/lib/format";
+import type { RotationEntry } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
+
+const rotations: RotationEntry[] = [];
 
 const POLICY_LABEL: Record<string, string> = {
   "30d": "Every 30 days",
@@ -60,6 +63,13 @@ export default function RotationsPage() {
               </td>
             </tr>
           ))}
+          {rotations.length === 0 && (
+            <tr>
+              <td colSpan={6} className="px-6 py-10 text-center text-fg-subtle">
+                No rotation schedules yet.
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>

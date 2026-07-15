@@ -4,7 +4,7 @@ import { useState } from "react";
 import { X, Copy, RotateCw, Trash2 } from "lucide-react";
 import type { Secret, PermissionLevel } from "@/lib/types";
 import { StatusBadge, ResultBadge } from "./StatusBadge";
-import { formatTimestamp, formatRelativeToNow } from "@/lib/data";
+import { formatTimestamp, formatRelativeToNow } from "@/lib/format";
 
 const TABS = ["Overview", "Versions", "Access History", "Permissions", "Settings"] as const;
 type Tab = (typeof TABS)[number];

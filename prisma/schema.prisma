@@ -12,12 +12,23 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  super_admin
+  admin
+  devops
+  developer
+  auditor
+}
+
 model Organization {
   id        String   @id @default(uuid())
   name      String   @unique
   createdAt DateTime @default(now())
 
-  users User[]
+  users      User[]
+  namespaces Namespace[]
+  secrets    Secret[]
+  auditLogs  AuditLog[]
 
   @@map("organizations")
 }
@@ -27,10 +38,131 @@ model User {
   fullName       String
   email          String   @unique
   passwordHash   String
-  role           String   @default("super_admin")
+  role           Role     @default(super_admin)
+  status         String   @default("active")
+  mfaEnabled     Boolean  @default(false)
+  lastActiveAt   DateTime?
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   createdAt      DateTime @default(now())
 
+  inviteTokenHash       String?   @unique
+  inviteTokenExpiresAt  DateTime?
+  invitedById           String?
+
+  sessions        Session[]
+  namespaceRoles  UserNamespaceRole[]
+  ownedNamespaces Namespace[]     @relation("NamespaceOwner")
+  ownedSecrets    Secret[]        @relation("SecretOwner")
+  createdVersions SecretVersion[]
+  auditLogs       AuditLog[]
+
   @@map("users")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("sessions")
+}
+
+model Namespace {
+  id             String   @id @default(uuid())
+  name           String
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  ownerId        String?
+  owner          User?    @relation("NamespaceOwner", fields: [ownerId], references: [id])
+  policyLabel    String?
+  createdAt      DateTime @default(now())
+
+  secrets   Secret[]
+  userRoles UserNamespaceRole[]
+  auditLogs AuditLog[]
+
+  @@unique([organizationId, name])
+  @@map("namespaces")
+}
+
+model UserNamespaceRole {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  namespaceId String
+  namespace   Namespace @relation(fields: [namespaceId], references: [id])
+  role        Role
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, namespaceId])
+  @@map("user_namespace_roles")
+}
+
+model Secret {
+  id             String    @id @default(uuid())
+  name           String
+  path           String
+  namespaceId    String
+  namespace      Namespace @relation(fields: [namespaceId], references: [id])
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  description    String    @default("")
+  tags           String[]  @default([])
+  status         String    @default("active")
+  rotationPolicy String    @default("manual")
+  nextRotation   DateTime?
+  expiresAt      DateTime?
+  ownerId        String?
+  owner          User?     @relation("SecretOwner", fields: [ownerId], references: [id])
+  currentVersion Int       @default(1)
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  versions SecretVersion[]
+
+  @@unique([namespaceId, path])
+  @@map("secrets")
+}
+
+model SecretVersion {
+  id          String   @id @default(uuid())
+  secretId    String
+  secret      Secret   @relation(fields: [secretId], references: [id])
+  version     Int
+  ciphertext  Bytes
+  iv          Bytes
+  authTag     Bytes
+  checksum    String
+  status      String   @default("active")
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@unique([secretId, version])
+  @@map("secret_versions")
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  actorId        String?
+  actor          User?    @relation(fields: [actorId], references: [id])
+  actorLabel     String
+  action         String
+  resourceType   String
+  resourceId     String?
+  resourceLabel  String
+  namespaceId    String?
+  namespace      Namespace? @relation(fields: [namespaceId], references: [id])
+  ip             String
+  result         String
+  createdAt      DateTime @default(now())
+
+  @@map("audit_logs")
 }

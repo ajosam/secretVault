@@ -2,11 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { Search, Download } from "lucide-react";
-import { auditLog, namespaces, formatTimestamp } from "@/lib/data";
-import type { ActionResult } from "@/lib/types";
+import { formatTimestamp } from "@/lib/format";
+import type { ActionResult, AuditLogEntry } from "@/lib/types";
 import { ResultBadge } from "@/components/StatusBadge";
 
-const ACTIONS = Array.from(new Set(auditLog.map((e) => e.action)));
+const auditLog: AuditLogEntry[] = [];
+const namespaces: { id: string; name: string }[] = [];
+const ACTIONS: string[] = [];
 
 export default function AuditLogsPage() {
   const [query, setQuery] = useState("");
