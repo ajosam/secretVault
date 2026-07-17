@@ -26,14 +26,19 @@ export function LoginForm() {
 
   async function onSubmit(values: LoginValues) {
     setFormError(null);
-    // No backend is wired up yet — this simulates the request/response cycle
-    // described in the auth spec (Part 6) so the screen behaves realistically.
-    await new Promise((resolve) => setTimeout(resolve, 700));
 
-    if (values.email !== "ajo@propcrm.com") {
-      setFormError("Invalid email or password.");
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: values.email, password: values.password }),
+    });
+
+    if (!res.ok) {
+      const { error } = await res.json();
+      setFormError(error?.message ?? "Something went wrong. Please try again.");
       return;
     }
+
     router.push("/");
   }
 
