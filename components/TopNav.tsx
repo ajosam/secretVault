@@ -3,11 +3,21 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Bell, Plus, ChevronDown, Settings, LogOut } from "lucide-react";
+import type { CurrentUser } from "./AppShell";
 
-export function TopNav() {
+function getInitials(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return (first + last).toUpperCase();
+}
+
+export function TopNav({ user }: { user: CurrentUser }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const firstName = user.fullName.trim().split(/\s+/)[0] ?? user.fullName;
+  const initials = getInitials(user.fullName);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -29,10 +39,9 @@ export function TopNav() {
     };
   }, [menuOpen]);
 
-  function handleLogout() {
-    // No backend session to clear yet — this simulates the "logout" flow
-    // from the auth spec (revoke session, redirect to /login).
+  async function handleLogout() {
     setMenuOpen(false);
+    await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
   }
 
@@ -51,7 +60,10 @@ export function TopNav() {
       </div>
 
       <div className="ml-auto flex items-center gap-2">
-        <button className="flex h-7 items-center gap-1.5 rounded-md bg-accent px-2.5 text-[12.5px] font-medium text-accent-fg transition-colors hover:bg-accent/90">
+        <button
+          onClick={() => router.push("/?new=1")}
+          className="flex h-7 items-center gap-1.5 rounded-md bg-accent px-2.5 text-[12.5px] font-medium text-accent-fg transition-colors hover:bg-accent/90"
+        >
           <Plus className="h-3.5 w-3.5" strokeWidth={2} />
           New Secret
         </button>
@@ -72,9 +84,9 @@ export function TopNav() {
             className="flex h-7 items-center gap-1.5 rounded-md border border-border pl-1 pr-1.5 text-[12.5px] text-fg transition-colors hover:bg-surface-hover"
           >
             <span className="flex h-5 w-5 items-center justify-center rounded-md bg-accent/20 text-[10px] font-semibold text-accent">
-              AJ
+              {initials}
             </span>
-            <span className="text-fg-muted">ajo@propcrm.com</span>
+            <span className="text-fg-muted">{firstName}</span>
             <ChevronDown className="h-3 w-3 text-fg-subtle" />
           </button>
 
@@ -84,8 +96,8 @@ export function TopNav() {
               className="absolute right-0 top-[calc(100%+4px)] w-48 rounded-md border border-border bg-surface-2 py-1"
             >
               <div className="border-b border-border-muted px-3 py-2">
-                <p className="truncate text-[12.5px] font-medium text-fg">Ajo Sam</p>
-                <p className="truncate text-[11.5px] text-fg-subtle">ajo@propcrm.com</p>
+                <p className="truncate text-[12.5px] font-medium text-fg">{user.fullName}</p>
+                <p className="truncate text-[11.5px] text-fg-subtle">{user.email}</p>
               </div>
               <button
                 role="menuitem"

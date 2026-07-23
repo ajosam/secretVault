@@ -35,16 +35,19 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export function DetailsPanel({ secret, onClose }: { secret: Secret | null; onClose: () => void }) {
   const [tab, setTab] = useState<Tab>("Overview");
 
-  if (!secret) {
-    return (
-      <div className="flex h-full w-[380px] shrink-0 flex-col items-center justify-center border-l border-border bg-surface px-6 text-center">
-        <p className="text-[12.5px] text-fg-subtle">Select a secret to view its metadata, versions, and access history.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex h-full w-[380px] shrink-0 flex-col border-l border-border bg-surface">
+    <div
+      className={`h-full shrink-0 overflow-hidden border-border bg-surface transition-[width] duration-300 ease-in-out ${
+        secret ? "w-[380px] border-l" : "w-0 border-l-0"
+      }`}
+    >
+      <div
+        className={`flex h-full w-[380px] flex-col transition-opacity duration-200 ${
+          secret ? "opacity-100 delay-150" : "opacity-0"
+        }`}
+      >
+      {secret && (
+      <>
       <div className="flex items-start justify-between gap-2 border-b border-border px-4 py-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -217,6 +220,9 @@ export function DetailsPanel({ secret, onClose }: { secret: Secret | null; onClo
             </div>
           </div>
         )}
+      </div>
+      </>
+      )}
       </div>
     </div>
   );

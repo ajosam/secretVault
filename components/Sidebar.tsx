@@ -23,7 +23,7 @@ const NAV_ITEMS = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-export function Sidebar() {
+export function Sidebar({ organizationName }: { organizationName: string }) {
   const pathname = usePathname();
 
   return (
@@ -57,7 +57,7 @@ export function Sidebar() {
         </ul>
       </nav>
       <div className="border-t border-border px-3 py-2.5 text-[11px] text-fg-subtle">
-        v2.4.1 · org: propcrm
+        v2.4.1 · org: {organizationName}
       </div>
     </aside>
   );
