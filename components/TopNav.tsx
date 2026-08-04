@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Search, Bell, Plus, ChevronDown, Settings, LogOut } from "lucide-react";
 import type { CurrentUser } from "./AppShell";
 
@@ -14,10 +14,21 @@ function getInitials(fullName: string): string {
 
 export function TopNav({ user }: { user: CurrentUser }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const firstName = user.fullName.trim().split(/\s+/)[0] ?? user.fullName;
   const initials = getInitials(user.fullName);
+
+  const [query, setQuery] = useState(searchParams.get("q") ?? "");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Keep local input state in sync if the URL changes from elsewhere
+  // (e.g. navigating to a different page clears "q").
+  useEffect(() => {
+    setQuery(searchParams.get("q") ?? "");
+  }, [searchParams]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -39,6 +50,25 @@ export function TopNav({ user }: { user: CurrentUser }) {
     };
   }, [menuOpen]);
 
+  useEffect(() => {
+    function handleGlobalKeyDown(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    }
+    document.addEventListener("keydown", handleGlobalKeyDown);
+    return () => document.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
+
+  function handleQueryChange(value: string) {
+    setQuery(value);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set("q", value);
+    else params.delete("q");
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
   async function handleLogout() {
     setMenuOpen(false);
     await fetch("/api/auth/logout", { method: "POST" });
@@ -50,13 +80,18 @@ export function TopNav({ user }: { user: CurrentUser }) {
       <div className="relative w-full max-w-md">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-subtle" />
         <input
+          ref={searchInputRef}
           type="text"
+          value={query}
+          onChange={(e) => handleQueryChange(e.target.value)}
           placeholder="Search secrets, namespaces, paths…"
           className="h-7 w-full rounded-md border border-border bg-surface-2 pl-8 pr-14 text-[12.5px] text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none"
         />
-        <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-border bg-canvas px-1.5 py-0.5 font-mono text-[10px] text-fg-subtle">
-          ⌘K
-        </kbd>
+        {!query && (
+          <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-border bg-canvas px-1.5 py-0.5 font-mono text-[10px] text-fg-subtle">
+            ⌘K
+          </kbd>
+        )}
       </div>
 
       <div className="ml-auto flex items-center gap-2">

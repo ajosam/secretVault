@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { signupApiSchema } from "@/lib/auth-schemas";
+import { logAudit, getClientIp } from "@/lib/audit";
 
 class ConflictError extends Error {
   constructor(message: string) {
@@ -49,6 +50,18 @@ export async function POST(request: Request) {
           role: "super_admin",
         },
       });
+    });
+
+    await logAudit({
+      organizationId: user.organizationId,
+      actorId: user.id,
+      actorLabel: user.email,
+      action: "organization.create",
+      resourceType: "organization",
+      resourceId: user.organizationId,
+      resourceLabel: organizationName,
+      ip: getClientIp(request),
+      result: "success",
     });
 
     return NextResponse.json(

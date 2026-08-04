@@ -1,20 +1,33 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, Download } from "lucide-react";
 import { formatTimestamp } from "@/lib/format";
-import type { ActionResult, AuditLogEntry } from "@/lib/types";
+import type { ActionResult, AuditLogEntry, Namespace } from "@/lib/types";
 import { ResultBadge } from "@/components/StatusBadge";
 
-const auditLog: AuditLogEntry[] = [];
-const namespaces: { id: string; name: string }[] = [];
-const ACTIONS: string[] = [];
-
 export default function AuditLogsPage() {
+  const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
+  const [namespaces, setNamespaces] = useState<Namespace[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [namespaceFilter, setNamespaceFilter] = useState("all");
   const [actionFilter, setActionFilter] = useState("all");
   const [resultFilter, setResultFilter] = useState<ActionResult | "all">("all");
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/audit-logs").then((res) => res.json()),
+      fetch("/api/namespaces").then((res) => res.json()),
+    ])
+      .then(([auditRes, namespacesRes]) => {
+        setAuditLog(auditRes.data ?? []);
+        setNamespaces(namespacesRes.data ?? []);
+      })
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  const ACTIONS = useMemo(() => Array.from(new Set(auditLog.map((e) => e.action))).sort(), [auditLog]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -31,7 +44,30 @@ export default function AuditLogsPage() {
         return false;
       return true;
     });
-  }, [query, namespaceFilter, actionFilter, resultFilter]);
+  }, [auditLog, query, namespaceFilter, actionFilter, resultFilter]);
+
+  function handleExport() {
+    const header = ["Timestamp", "Actor", "Action", "Resource", "Namespace", "IP", "Result"];
+    const rows = filtered.map((e) => [
+      formatTimestamp(e.timestamp),
+      e.actor,
+      e.action,
+      e.resource,
+      e.namespace,
+      e.ip,
+      e.result,
+    ]);
+    const csv = [header, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -83,7 +119,11 @@ export default function AuditLogsPage() {
           <option value="denied">Denied</option>
         </select>
 
-        <button className="ml-auto flex h-7 items-center gap-1.5 rounded-md border border-border px-2.5 text-[12.5px] text-fg-muted hover:bg-surface-hover">
+        <button
+          onClick={handleExport}
+          disabled={filtered.length === 0}
+          className="ml-auto flex h-7 items-center gap-1.5 rounded-md border border-border px-2.5 text-[12.5px] text-fg-muted hover:bg-surface-hover disabled:opacity-50"
+        >
           <Download className="h-3.5 w-3.5" />
           Export
         </button>
@@ -116,10 +156,17 @@ export default function AuditLogsPage() {
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 && (
+            {!isLoading && filtered.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-10 text-center text-fg-subtle">
                   No audit events match the current filters.
+                </td>
+              </tr>
+            )}
+            {isLoading && (
+              <tr>
+                <td colSpan={7} className="px-4 py-10 text-center text-fg-subtle">
+                  Loading…
                 </td>
               </tr>
             )}
@@ -129,7 +176,7 @@ export default function AuditLogsPage() {
 
       <div className="flex items-center justify-between border-t border-border px-4 py-2 text-[11.5px] text-fg-subtle">
         <span>{filtered.length} of {auditLog.length} events</span>
-        <span>Showing last 30 days</span>
+        <span>Showing most recent 200 events</span>
       </div>
     </div>
   );

@@ -3,58 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { encryptSecretValue } from "@/lib/crypto";
 import { createSecretSchema } from "@/lib/secret-schemas";
-import type { Secret } from "@/lib/types";
+import { logAudit, getClientIp } from "@/lib/audit";
+import { serializeSecret, SECRET_INCLUDE } from "@/lib/secret-serializer";
+import type { AccessEvent } from "@/lib/types";
 
 class ConflictError extends Error {
   constructor(message: string) {
     super(message);
   }
-}
-
-function serializeSecret(secret: {
-  id: string;
-  name: string;
-  path: string;
-  namespace: { name: string };
-  description: string;
-  tags: string[];
-  status: string;
-  rotationPolicy: string;
-  nextRotation: Date | null;
-  expiresAt: Date | null;
-  owner: { fullName: string } | null;
-  currentVersion: number;
-  createdAt: Date;
-  updatedAt: Date;
-  versions: { version: number; createdAt: Date; createdBy: { fullName: string }; status: string; checksum: string }[];
-}): Secret {
-  return {
-    id: secret.id,
-    name: secret.name,
-    path: secret.path,
-    namespace: secret.namespace.name,
-    version: secret.currentVersion,
-    updatedAt: secret.updatedAt.toISOString(),
-    createdAt: secret.createdAt.toISOString(),
-    rotationPolicy: secret.rotationPolicy as Secret["rotationPolicy"],
-    nextRotation: secret.nextRotation ? secret.nextRotation.toISOString() : null,
-    status: secret.status as Secret["status"],
-    owner: secret.owner?.fullName ?? "",
-    expiresAt: secret.expiresAt ? secret.expiresAt.toISOString() : null,
-    tags: secret.tags,
-    description: secret.description,
-    versions: secret.versions
-      .sort((a, b) => b.version - a.version)
-      .map((v) => ({
-        version: v.version,
-        createdAt: v.createdAt.toISOString(),
-        createdBy: v.createdBy.fullName,
-        status: v.status as "active" | "archived",
-        checksum: v.checksum,
-      })),
-    accessHistory: [],
-    permissions: [],
-  };
 }
 
 export async function GET() {
@@ -65,15 +21,41 @@ export async function GET() {
 
   const secrets = await prisma.secret.findMany({
     where: { organizationId: session.user.organizationId, deletedAt: null },
-    include: {
-      namespace: true,
-      owner: true,
-      versions: { include: { createdBy: true } },
-    },
+    include: SECRET_INCLUDE,
     orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json({ data: secrets.map(serializeSecret) }, { status: 200 });
+  const secretIds = secrets.map((s) => s.id);
+  const auditEntries = secretIds.length
+    ? await prisma.auditLog.findMany({
+        where: {
+          organizationId: session.user.organizationId,
+          resourceType: "secret",
+          resourceId: { in: secretIds },
+        },
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
+
+  const accessHistoryBySecretId = new Map<string, AccessEvent[]>();
+  for (const entry of auditEntries) {
+    if (!entry.resourceId) continue;
+    const list = accessHistoryBySecretId.get(entry.resourceId) ?? [];
+    list.push({
+      id: entry.id,
+      actor: entry.actorLabel,
+      action: entry.action,
+      timestamp: entry.createdAt.toISOString(),
+      result: entry.result as AccessEvent["result"],
+      ip: entry.ip,
+    });
+    accessHistoryBySecretId.set(entry.resourceId, list);
+  }
+
+  return NextResponse.json(
+    { data: secrets.map((s) => serializeSecret(s, accessHistoryBySecretId.get(s.id) ?? [])) },
+    { status: 200 },
+  );
 }
 
 export async function POST(request: Request) {
@@ -105,6 +87,11 @@ export async function POST(request: Request) {
       if (!namespace) {
         namespace = await tx.namespace.create({
           data: { name: namespaceName, organizationId, ownerId: session.user.id },
+        });
+        await tx.userNamespaceRole.upsert({
+          where: { userId_namespaceId: { userId: session.user.id, namespaceId: namespace.id } },
+          create: { userId: session.user.id, namespaceId: namespace.id, role: "admin" },
+          update: {},
         });
       }
 
@@ -147,6 +134,19 @@ export async function POST(request: Request) {
       });
 
       return created;
+    });
+
+    await logAudit({
+      organizationId,
+      actorId: session.user.id,
+      actorLabel: session.user.email,
+      action: "secret.create",
+      resourceType: "secret",
+      resourceId: secret.id,
+      resourceLabel: secret.name,
+      namespaceId: secret.namespaceId,
+      ip: getClientIp(request),
+      result: "success",
     });
 
     return NextResponse.json({ data: serializeSecret(secret) }, { status: 201 });

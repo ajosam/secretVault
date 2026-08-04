@@ -10,3 +10,9 @@ export const createSecretSchema = z.object({
 });
 
 export type CreateSecretPayload = z.infer<typeof createSecretSchema>;
+
+export const rotateSecretSchema = z.object({
+  value: z.string().min(1, "Value is required"),
+});
+
+export type RotateSecretPayload = z.infer<typeof rotateSecretSchema>;

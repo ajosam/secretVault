@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { X, Copy, RotateCw, Trash2 } from "lucide-react";
+import { X, Copy, RotateCw, Trash2, Loader2 } from "lucide-react";
 import type { Secret, PermissionLevel } from "@/lib/types";
 import { StatusBadge, ResultBadge } from "./StatusBadge";
 import { formatTimestamp, formatRelativeToNow } from "@/lib/format";
+import { RotateSecretDialog } from "./RotateSecretDialog";
 
 const TABS = ["Overview", "Versions", "Access History", "Permissions", "Settings"] as const;
 type Tab = (typeof TABS)[number];
@@ -32,8 +33,34 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-export function DetailsPanel({ secret, onClose }: { secret: Secret | null; onClose: () => void }) {
+export function DetailsPanel({
+  secret,
+  onClose,
+  onRotated,
+  onDeleted,
+}: {
+  secret: Secret | null;
+  onClose: () => void;
+  onRotated: (secret: Secret) => void;
+  onDeleted: (id: string) => void;
+}) {
   const [tab, setTab] = useState<Tab>("Overview");
+  const [rotateOpen, setRotateOpen] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (!secret) return;
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      return;
+    }
+    setIsDeleting(true);
+    await fetch(`/api/secrets/${secret.id}`, { method: "DELETE" });
+    setIsDeleting(false);
+    setConfirmingDelete(false);
+    onDeleted(secret.id);
+  }
 
   return (
     <div
@@ -65,12 +92,12 @@ export function DetailsPanel({ secret, onClose }: { secret: Secret | null; onClo
         </button>
       </div>
 
-      <div className="flex border-b border-border px-2">
+      <div className="flex overflow-x-auto border-b border-border px-2">
         {TABS.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`whitespace-nowrap border-b-2 px-2.5 py-2 text-[12px] font-medium transition-colors ${
+            className={`shrink-0 whitespace-nowrap border-b-2 px-1.5 py-2 text-[11.5px] font-medium transition-colors ${
               tab === t
                 ? "border-accent text-fg"
                 : "border-transparent text-fg-subtle hover:text-fg-muted"
@@ -124,7 +151,10 @@ export function DetailsPanel({ secret, onClose }: { secret: Secret | null; onClo
               <button className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[12px] font-medium text-fg hover:bg-surface-hover">
                 <Copy className="h-3.5 w-3.5" /> Copy path
               </button>
-              <button className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[12px] font-medium text-fg hover:bg-surface-hover">
+              <button
+                onClick={() => setRotateOpen(true)}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[12px] font-medium text-fg hover:bg-surface-hover"
+              >
                 <RotateCw className="h-3.5 w-3.5" /> Rotate now
               </button>
             </div>
@@ -214,8 +244,17 @@ export function DetailsPanel({ secret, onClose }: { secret: Secret | null; onClo
               <p className="mt-1 text-[11.5px] text-fg-muted">
                 Deleting this secret revokes access immediately for all consumers.
               </p>
-              <button className="mt-2 flex items-center gap-1.5 rounded-md border border-danger/40 px-2.5 py-1.5 text-[12px] font-medium text-danger hover:bg-danger/10">
-                <Trash2 className="h-3.5 w-3.5" /> Delete secret
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="mt-2 flex items-center gap-1.5 rounded-md border border-danger/40 px-2.5 py-1.5 text-[12px] font-medium text-danger hover:bg-danger/10 disabled:opacity-60"
+              >
+                {isDeleting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+                {confirmingDelete ? "Click again to confirm" : "Delete secret"}
               </button>
             </div>
           </div>
@@ -224,6 +263,11 @@ export function DetailsPanel({ secret, onClose }: { secret: Secret | null; onClo
       </>
       )}
       </div>
+      <RotateSecretDialog
+        secret={rotateOpen ? secret : null}
+        onClose={() => setRotateOpen(false)}
+        onRotated={onRotated}
+      />
     </div>
   );
 }
